@@ -15,7 +15,7 @@ export default function AppLayout() {
           contentStyle: { backgroundColor: '#0A0A0A' },
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Mis Órdenes' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="ot/[id]" options={{ title: 'Detalle OT' }} />
       </Stack>
     </View>

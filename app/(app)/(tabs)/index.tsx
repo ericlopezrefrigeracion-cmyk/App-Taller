@@ -10,11 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { router } from 'expo-router';
-import api from '../../lib/api';
-import { logout } from '../../lib/auth';
-import { getUser } from '../../lib/auth';
-import EstadoBadge from '../../components/EstadoBadge';
-import type { OTResumen } from '../../lib/types';
+import api from '../../../lib/api';
+import { logout, getUser } from '../../../lib/auth';
+import EstadoBadge from '../../../components/EstadoBadge';
+import type { OTResumen } from '../../../lib/types';
 
 const TIPO_LABEL: Record<string, string> = {
   correctivo:  'Correctivo',
@@ -45,10 +44,10 @@ function nombreCliente(c: OTResumen['cliente']): string {
 }
 
 export default function HomeScreen() {
-  const [ots, setOts]           = useState<OTResumen[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [ots, setOts]               = useState<OTResumen[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName]     = useState('');
 
   const fetchOts = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -152,129 +151,37 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0A0A0A',
-  },
+  container: { flex: 1, backgroundColor: '#0A0A0A' },
+  center:    { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0A0A0A' },
   topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F1F1F',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: '#1F1F1F',
   },
-  topBarTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#F5F5F5',
-  },
-  topBarSub: {
-    fontSize: 12,
-    color: '#888888',
-    marginTop: 2,
-  },
+  topBarTitle: { fontSize: 18, fontWeight: '700', color: '#F5F5F5' },
+  topBarSub:   { fontSize: 12, color: '#888888', marginTop: 2 },
   logoutBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#1F1F1F',
-    borderRadius: 4,
+    paddingVertical: 6, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: '#1F1F1F', borderRadius: 4,
   },
-  logoutText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#888888',
-    letterSpacing: 1,
-  },
-  listContent: {
-    padding: 12,
-    gap: 10,
-  },
-  emptyContainer: {
-    flex: 1,
-  },
-  emptyInner: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-    gap: 8,
-  },
-  emptyText: {
-    color: '#888888',
-    fontSize: 16,
-  },
-  emptyHint: {
-    color: '#555555',
-    fontSize: 13,
-  },
+  logoutText:   { fontSize: 11, fontWeight: '700', color: '#888888', letterSpacing: 1 },
+  listContent:  { padding: 12, gap: 10 },
+  emptyContainer: { flex: 1 },
+  emptyInner: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100, gap: 8 },
+  emptyText:  { color: '#888888', fontSize: 16 },
+  emptyHint:  { color: '#555555', fontSize: 13 },
   card: {
-    backgroundColor: '#141414',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1F1F1F',
-    padding: 14,
-    gap: 6,
+    backgroundColor: '#141414', borderRadius: 8,
+    borderWidth: 1, borderColor: '#1F1F1F', padding: 14, gap: 6,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  cardNumero: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#E8500A',
-    letterSpacing: 0.5,
-  },
-  cardCliente: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#F5F5F5',
-  },
-  cardDesc: {
-    fontSize: 13,
-    color: '#888888',
-    lineHeight: 18,
-  },
-  cardEquipo: {
-    fontSize: 12,
-    color: '#666666',
-    fontStyle: 'italic',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cardTipo: {
-    fontSize: 11,
-    color: '#666666',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  cardFooterRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  prioDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  cardFecha: {
-    fontSize: 12,
-    color: '#888888',
-  },
+  cardHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardNumero:     { fontSize: 13, fontWeight: '700', color: '#E8500A', letterSpacing: 0.5 },
+  cardCliente:    { fontSize: 15, fontWeight: '600', color: '#F5F5F5' },
+  cardDesc:       { fontSize: 13, color: '#888888', lineHeight: 18 },
+  cardEquipo:     { fontSize: 12, color: '#666666', fontStyle: 'italic' },
+  cardFooter:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  cardTipo:       { fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: 0.5 },
+  cardFooterRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  prioDot:        { width: 6, height: 6, borderRadius: 3 },
+  cardFecha:      { fontSize: 12, color: '#888888' },
 });
