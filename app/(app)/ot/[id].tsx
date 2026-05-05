@@ -22,6 +22,7 @@ import type {
   EstadoOT,
   OTChecklist,
   OTFoto,
+  OTClienteDetalle,
 } from '../../../lib/types';
 import EstadoBadge from '../../../components/EstadoBadge';
 import SignaturePad, { SignaturePadRef } from '../../../components/SignaturePad';
@@ -29,31 +30,15 @@ import SignaturePad, { SignaturePadRef } from '../../../components/SignaturePad'
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TIPO_LABEL: Record<string, string> = {
-  service:     'Service',
+  correctivo:  'Correctivo',
+  preventivo:  'Preventivo',
   instalacion: 'Instalación',
-  garantia:    'Garantía',
-  diagnostico: 'Diagnóstico',
-  otro:        'Otro',
-};
-
-const PRIORIDAD_LABEL: Record<string, string> = {
-  baja:    'Baja',
-  normal:  'Normal',
-  alta:    'Alta',
-  urgente: 'Urgente',
-};
-
-const PRIORIDAD_COLOR: Record<string, string> = {
-  baja:    '#555',
-  normal:  '#888',
-  alta:    '#E8A020',
-  urgente: '#E84040',
 };
 
 type Transicion = { label: string; estado: EstadoOT };
 
 const TRANSICIONES: Record<EstadoOT, Transicion[]> = {
-  borrador:           [{ label: 'Iniciar', estado: 'en_curso' }],
+  borrador:           [],
   asignada:           [{ label: 'Iniciar trabajo', estado: 'en_curso' }],
   en_curso:           [
     { label: 'Suspender — falta repuesto', estado: 'pendiente_repuesto' },
@@ -72,9 +57,18 @@ function formatFecha(iso: string | null): string {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function nombreCliente(c: OrdenTrabajo['cliente']): string {
-  if (c.empresa) return c.empresa;
-  return [c.nombre, c.apellido].filter(Boolean).join(' ');
+function nombreCliente(c: OTClienteDetalle): string {
+  if (c.razon_social) return c.razon_social;
+  return [c.nombre, c.apellido].filter(Boolean).join(' ') || '—';
+}
+
+function clienteTelefono(c: OTClienteDetalle): string | null {
+  const ct = c.contactos?.[0];
+  return ct?.whatsapp ?? ct?.telefono ?? null;
+}
+
+function clienteEmail(c: OTClienteDetalle): string | null {
+  return c.contactos?.[0]?.email ?? null;
 }
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
@@ -257,12 +251,6 @@ export default function OTDetailScreen() {
             <Text style={styles.infoValue}>{TIPO_LABEL[ot.tipo] ?? ot.tipo}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Prioridad</Text>
-            <Text style={[styles.infoValue, { color: PRIORIDAD_COLOR[ot.prioridad] }]}>
-              {PRIORIDAD_LABEL[ot.prioridad] ?? ot.prioridad}
-            </Text>
-          </View>
-          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Fecha</Text>
             <Text style={styles.infoValue}>
               {formatFecha(ot.fecha_programada)}
@@ -273,10 +261,10 @@ export default function OTDetailScreen() {
             <Text style={styles.infoLabel}>Descripción</Text>
             <Text style={[styles.infoValue, { flex: 1 }]}>{ot.descripcion}</Text>
           </View>
-          {ot.notas ? (
+          {ot.notas_internas ? (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Notas</Text>
-              <Text style={[styles.infoValue, { flex: 1 }]}>{ot.notas}</Text>
+              <Text style={[styles.infoValue, { flex: 1 }]}>{ot.notas_internas}</Text>
             </View>
           ) : null}
         </View>
@@ -286,13 +274,13 @@ export default function OTDetailScreen() {
           <Text style={styles.sectionTitle}>Cliente</Text>
 
           <Text style={styles.clienteNombre}>{nombreCliente(ot.cliente)}</Text>
-          {ot.cliente.telefono ? (
-            <TouchableOpacity onPress={() => Linking.openURL(`tel:${ot.cliente.telefono}`)}>
-              <Text style={styles.link}>📞 {ot.cliente.telefono}</Text>
+          {clienteTelefono(ot.cliente) ? (
+            <TouchableOpacity onPress={() => Linking.openURL(`tel:${clienteTelefono(ot.cliente)}`)}>
+              <Text style={styles.link}>📞 {clienteTelefono(ot.cliente)}</Text>
             </TouchableOpacity>
           ) : null}
-          {ot.cliente.email ? (
-            <Text style={styles.infoMuted}>{ot.cliente.email}</Text>
+          {clienteEmail(ot.cliente) ? (
+            <Text style={styles.infoMuted}>{clienteEmail(ot.cliente)}</Text>
           ) : null}
         </View>
 
@@ -303,11 +291,13 @@ export default function OTDetailScreen() {
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Marca / Modelo</Text>
-              <Text style={styles.infoValue}>{ot.equipo.marca} {ot.equipo.modelo}</Text>
+              <Text style={styles.infoValue}>
+                {ot.equipo.modelo?.marca?.nombre ?? ''} {ot.equipo.modelo?.nombre ?? ''}
+              </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Tipo</Text>
-              <Text style={styles.infoValue}>{ot.equipo.tipo}</Text>
+              <Text style={styles.infoValue}>{ot.equipo.tipo?.nombre ?? '—'}</Text>
             </View>
             {ot.equipo.numero_serie ? (
               <View style={styles.infoRow}>
@@ -315,10 +305,10 @@ export default function OTDetailScreen() {
                 <Text style={styles.infoValue}>{ot.equipo.numero_serie}</Text>
               </View>
             ) : null}
-            {ot.equipo.ubicacion ? (
+            {ot.equipo.espacio ? (
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Ubicación</Text>
-                <Text style={[styles.infoValue, { flex: 1 }]}>{ot.equipo.ubicacion}</Text>
+                <Text style={[styles.infoValue, { flex: 1 }]}>{ot.equipo.espacio}</Text>
               </View>
             ) : null}
           </View>
@@ -412,10 +402,10 @@ export default function OTDetailScreen() {
         )}
 
         {/* ── 7. Checklist ────────────────────────────────────────────── */}
-        {ot.checklists.length > 0 && (
+        {ot.checklist.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Checklist</Text>
-            {ot.checklists.map((cl) => (
+            {ot.checklist.map((cl) => (
               <ChecklistSection
                 key={cl.id}
                 checklist={cl}
@@ -498,15 +488,12 @@ export default function OTDetailScreen() {
             {ot.historial.map((h) => (
               <View key={h.id} style={styles.historialItem}>
                 <View style={styles.historialHeader}>
-                  <EstadoBadge estado={h.estado_nuevo} />
+                  <EstadoBadge estado={h.estado_hasta} />
                   <Text style={styles.historialFecha}>
-                    {new Date(h.created_at).toLocaleDateString('es-AR')}
+                    {new Date(h.creado_en).toLocaleDateString('es-AR')}
                   </Text>
                 </View>
                 {h.notas ? <Text style={styles.historialNotas}>{h.notas}</Text> : null}
-                {h.usuario && (
-                  <Text style={styles.historialUsuario}>por {h.usuario.nombre}</Text>
-                )}
               </View>
             ))}
           </View>
@@ -639,7 +626,7 @@ function ChecklistSection({ checklist, otId, canToggle, onToggle }: ChecklistSec
   return (
     <View style={styles.checklistContainer}>
       <View style={styles.checklistHeader}>
-        <Text style={styles.checklistNombre}>{checklist.nombre}</Text>
+        <Text style={styles.checklistNombre}>{checklist.plantilla_nombre}</Text>
         <Text style={styles.checklistProgress}>
           {completadas}/{checklist.tareas.length}
         </Text>
@@ -657,7 +644,7 @@ function ChecklistSection({ checklist, otId, canToggle, onToggle }: ChecklistSec
               {tarea.completada && <Text style={styles.tareaCheckMark}>✓</Text>}
             </View>
             <Text style={[styles.tareaDesc, tarea.completada && styles.tareaDescDone]}>
-              {tarea.descripcion}
+              {tarea.nombre}
             </Text>
           </TouchableOpacity>
         ))}

@@ -17,11 +17,9 @@ import EstadoBadge from '../../components/EstadoBadge';
 import type { OTResumen } from '../../lib/types';
 
 const TIPO_LABEL: Record<string, string> = {
-  service:     'Service',
+  correctivo:  'Correctivo',
+  preventivo:  'Preventivo',
   instalacion: 'Instalación',
-  garantia:    'Garantía',
-  diagnostico: 'Diagnóstico',
-  otro:        'Otro',
 };
 
 const PRIORIDAD_COLOR: Record<string, string> = {

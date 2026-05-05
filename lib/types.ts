@@ -15,26 +15,19 @@ export type EstadoOT =
   | 'cancelada';
 
 export type TipoOT =
-  | 'service'
-  | 'instalacion'
-  | 'garantia'
-  | 'diagnostico'
-  | 'otro';
+  | 'correctivo'
+  | 'preventivo'
+  | 'instalacion';
 
 export type PrioridadOT = 'baja' | 'normal' | 'alta' | 'urgente';
 
-export interface UsuarioResumen {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: string;
-}
+// ─── Tipos para GET /ots/mis-ots (respuesta transformada por el backend) ────
 
 export interface ClienteResumen {
   id: string;
-  nombre: string;
+  nombre: string | null;
   apellido: string | null;
-  empresa: string | null;
+  empresa: string | null;   // razon_social para empresas
   telefono: string | null;
   email: string | null;
 }
@@ -48,89 +41,108 @@ export interface EquipoResumen {
   ubicacion: string | null;
 }
 
-export interface ProductoResumen {
+export interface OTResumen {
   id: string;
-  nombre: string;
-  codigo: string | null;
-  unidad: string;
-  precio_costo: number | null;
+  numero: string;
+  tipo: TipoOT;
+  estado: EstadoOT;
+  prioridad: PrioridadOT;
+  descripcion: string;
+  fecha_programada: string | null;
+  hora_programada: string | null;
+  created_at: string;
+  cliente: ClienteResumen;
+  equipo: EquipoResumen | null;
+  tecnico_asignado: { id: string; nombre: string; email: string; rol: string } | null;
+}
+
+// ─── Tipos para GET /ots/:id (formato nativo del backend) ───────────────────
+
+export interface OTClienteDetalle {
+  id: string;
+  tipo: string;
+  nombre: string | null;
+  apellido: string | null;
+  razon_social: string | null;
+  contactos: { nombre: string; telefono: string | null; whatsapp: string | null; email: string | null }[];
+}
+
+export interface OTEquipoDetalle {
+  id: string;
+  codigo_interno: string;
+  espacio: string | null;
+  numero_serie: string | null;
+  tipo: { nombre: string; rubro?: { nombre: string } } | null;
+  modelo: { nombre: string; marca: { nombre: string } } | null;
 }
 
 export interface OTItem {
   id: string;
   cantidad: number;
-  precio_unitario: number | null;
   notas: string | null;
-  producto: ProductoResumen;
+  precio_costo_usd_snap: string;
+  tc_valor_snap: string;
+  producto: {
+    id: string;
+    nombre: string;
+    codigo: string | null;
+    tipo: string;
+    unidad: string;
+  };
 }
 
 export interface OTFoto {
   id: string;
   url: string;
   descripcion: string | null;
-  created_at: string;
+  creado_en: string;
 }
 
 export interface OTChecklistTarea {
   id: string;
-  descripcion: string;
+  nombre: string;
   orden: number;
+  obligatoria: boolean;
   completada: boolean;
   completada_en: string | null;
-  completada_por: UsuarioResumen | null;
 }
 
 export interface OTChecklist {
   id: string;
-  nombre: string;
+  plantilla_nombre: string;
   tareas: OTChecklistTarea[];
 }
 
 export interface OTHistorial {
   id: string;
-  estado_anterior: EstadoOT | null;
-  estado_nuevo: EstadoOT;
+  estado_desde: EstadoOT | null;
+  estado_hasta: EstadoOT;
   notas: string | null;
-  created_at: string;
-  usuario: UsuarioResumen | null;
+  creado_en: string;
+  usuario_id: string;
 }
 
 export interface OrdenTrabajo {
   id: string;
-  numero: number;
+  numero: string;
   tipo: TipoOT;
   estado: EstadoOT;
-  prioridad: PrioridadOT;
   descripcion: string;
   diagnostico: string | null;
   trabajo_realizado: string | null;
   fecha_programada: string | null;
   hora_programada: string | null;
-  notas: string | null;
+  notas_internas: string | null;
   firma_cliente: string | null;
   firmado_por: string | null;
-  created_at: string;
-  updated_at: string;
-  cliente: ClienteResumen;
-  equipo: EquipoResumen | null;
-  tecnico_asignado: UsuarioResumen | null;
+  es_garantia: boolean;
+  creado_en: string;
+  actualizado_en: string;
+  cliente: OTClienteDetalle;
+  equipo: OTEquipoDetalle | null;
+  tecnico: { id: string; nombre: string; apellido: string; email: string } | null;
   items: OTItem[];
   fotos: OTFoto[];
-  checklists: OTChecklist[];
+  checklist: OTChecklist[];
   historial: OTHistorial[];
-}
-
-export interface OTResumen {
-  id: string;
-  numero: number;
-  tipo: TipoOT;
-  estado: EstadoOT;
-  prioridad: PrioridadOT;
-  descripcion: string;
-  fecha_programada: string | null;
-  hora_programada: string | null;
-  created_at: string;
-  cliente: ClienteResumen;
-  equipo: EquipoResumen | null;
-  tecnico_asignado: UsuarioResumen | null;
 }
