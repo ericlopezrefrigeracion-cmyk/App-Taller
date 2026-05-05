@@ -25,21 +25,21 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Mis Órdenes',
-          tabBarIcon={() => <Icon label="📋" />}
+          tabBarIcon: () => <Icon label="📋" />,
         }}
       />
       <Tabs.Screen
         name="equipo-nuevo"
         options={{
           title: 'Nuevo Equipo',
-          tabBarIcon={() => <Icon label="🔧" />}
+          tabBarIcon: () => <Icon label="🔧" />,
         }}
       />
       <Tabs.Screen
         name="fichaje"
         options={{
           title: 'Fichaje',
-          tabBarIcon={() => <Icon label="🕐" />}
+          tabBarIcon: () => <Icon label="🕐" />,
         }}
       />
     </Tabs>
