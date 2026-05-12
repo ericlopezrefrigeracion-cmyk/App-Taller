@@ -17,6 +17,7 @@ export default function AppLayout() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="ot/[id]" options={{ title: 'Detalle OT' }} />
+        <Stack.Screen name="oa/[id]" options={{ title: 'Orden de Armado' }} />
       </Stack>
     </View>
   );

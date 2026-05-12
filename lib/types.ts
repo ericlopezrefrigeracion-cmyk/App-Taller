@@ -122,6 +122,32 @@ export interface OTHistorial {
   usuario_id: string;
 }
 
+// ─── Tipos para GET /ordenes-armado/mis-ordenes ──────────────────────────────
+
+export interface OAItem {
+  id: number;
+  cantidadRequerida: string;
+  cantidadUsada: string;
+  producto: {
+    id: string;
+    nombre: string;
+    unidad: string;
+    stock: number;
+    tipo: string;
+  };
+}
+
+export interface OrdenArmadoResumen {
+  id: number;
+  numero: string;
+  estado: 'pendiente' | 'ejecutada' | 'cancelada';
+  cantidadAProducir: string;
+  notas: string | null;
+  createdAt: string;
+  kit: { id: string; nombre: string; codigo: string | null; unidad: string };
+  items: OAItem[];
+}
+
 export interface OrdenTrabajo {
   id: string;
   numero: string;
