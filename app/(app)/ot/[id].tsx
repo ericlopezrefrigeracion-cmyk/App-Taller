@@ -169,10 +169,43 @@ export default function OTDetailScreen() {
 
   // ── Fotos ──────────────────────────────────────────────────────────────────
   async function handleAgregarFoto() {
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
+    Alert.alert('Agregar foto', '¿Desde dónde?', [
+      {
+        text: 'Cámara',
+        onPress: () => pickFoto('camera'),
+      },
+      {
+        text: 'Galería',
+        onPress: () => pickFoto('library'),
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
+  async function pickFoto(source: 'camera' | 'library') {
+    let result: ImagePicker.ImagePickerResult;
+    if (source === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Habilitá el acceso a la cámara en ajustes.');
+        return;
+      }
+      result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso requerido', 'Habilitá el acceso a la galería en ajustes.');
+        return;
+      }
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+    }
+
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
