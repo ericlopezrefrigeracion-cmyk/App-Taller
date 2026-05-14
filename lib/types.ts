@@ -41,6 +41,13 @@ export interface EquipoResumen {
   ubicacion: string | null;
 }
 
+export interface OTDireccion {
+  calle: string;
+  numero: string | null;
+  ciudad: string;
+  provincia: string;
+}
+
 export interface OTResumen {
   id: string;
   numero: string;
@@ -52,6 +59,7 @@ export interface OTResumen {
   hora_programada: string | null;
   created_at: string;
   cliente: ClienteResumen;
+  direccion: OTDireccion | null;
   equipo: EquipoResumen | null;
   tecnico_asignado: { id: string; nombre: string; email: string; rol: string } | null;
 }
@@ -165,6 +173,7 @@ export interface OrdenTrabajo {
   creado_en: string;
   actualizado_en: string;
   cliente: OTClienteDetalle;
+  direccion: OTDireccion | null;
   equipo: OTEquipoDetalle | null;
   tecnico: { id: string; nombre: string; apellido: string; email: string } | null;
   items: OTItem[];

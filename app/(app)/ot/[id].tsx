@@ -282,6 +282,19 @@ export default function OTDetailScreen() {
           {clienteEmail(ot.cliente) ? (
             <Text style={styles.infoMuted}>{clienteEmail(ot.cliente)}</Text>
           ) : null}
+          {ot.direccion ? (() => {
+            const d = ot.direccion;
+            const partes = [d.calle, d.numero, d.ciudad, d.provincia].filter(Boolean).join(', ');
+            const query  = encodeURIComponent(partes);
+            return (
+              <TouchableOpacity
+                style={{ marginTop: 6 }}
+                onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`)}
+              >
+                <Text style={styles.link}>📍 {partes}</Text>
+              </TouchableOpacity>
+            );
+          })() : null}
         </View>
 
         {/* ── 3. Equipo ───────────────────────────────────────────────── */}
