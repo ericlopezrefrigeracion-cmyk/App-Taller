@@ -22,15 +22,6 @@ function nombreCliente(c: Cliente): string {
   return [c.nombre, c.apellido].filter(Boolean).join(' ') || '—';
 }
 
-function generarCodigo(): string {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const mi = String(now.getMinutes()).padStart(2, '0');
-  return `EQ-${yy}${mm}${dd}-${hh}${mi}`;
-}
 
 // ─── Selector con opción "Crear nuevo" ───────────────────────────────────────
 
@@ -192,7 +183,8 @@ export default function EquipoNuevoScreen() {
   const [tipoId,      setTipoId]      = useState('');
   const [marcaId,     setMarcaId]     = useState('');
   const [modeloId,    setModeloId]    = useState('');
-  const [codigo,      setCodigo]      = useState(generarCodigo);
+  const [codigo,      setCodigo]      = useState('');
+  const [modoAuto,    setModoAuto]    = useState(false);
   const [numeroSerie, setNumeroSerie] = useState('');
   const [espacio,     setEspacio]     = useState('');
   const [notas,       setNotas]       = useState('');
@@ -260,6 +252,15 @@ export default function EquipoNuevoScreen() {
     return nuevo;
   }
 
+  async function buscarProximoCodigo() {
+    try {
+      const { data } = await api.get<{ codigo: string }>('/equipos/proximo-codigo');
+      setCodigo(data.codigo);
+    } catch {
+      setCodigo('');
+    }
+  }
+
   async function handleGuardar() {
     if (!clienteId)      return Alert.alert('Falta dato', 'Seleccioná un cliente');
     if (!tipoId)         return Alert.alert('Falta dato', 'Seleccioná el tipo de equipo');
@@ -289,7 +290,7 @@ export default function EquipoNuevoScreen() {
 
   function resetForm() {
     setClienteId(''); setClienteQ(''); setRubroId(''); setTipoId('');
-    setMarcaId(''); setModeloId(''); setCodigo(generarCodigo());
+    setMarcaId(''); setModeloId(''); setCodigo(''); setModoAuto(false);
     setNumeroSerie(''); setEspacio(''); setNotas('');
   }
 
@@ -383,13 +384,28 @@ export default function EquipoNuevoScreen() {
       {/* ── Código interno ── */}
       <View style={styles.fieldGroup}>
         <Text style={styles.fieldLabel}>Código interno *</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, !modoAuto && styles.toggleBtnActive]}
+            onPress={() => { setModoAuto(false); setCodigo(''); }}
+          >
+            <Text style={[styles.toggleBtnText, !modoAuto && styles.toggleBtnTextActive]}>Manual</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, modoAuto && styles.toggleBtnActive]}
+            onPress={() => { setModoAuto(true); buscarProximoCodigo(); }}
+          >
+            <Text style={[styles.toggleBtnText, modoAuto && styles.toggleBtnTextActive]}>Consecutivo</Text>
+          </TouchableOpacity>
+        </View>
         <TextInput
-          style={styles.input}
+          style={[styles.input, modoAuto && styles.inputDisabled]}
           value={codigo}
-          onChangeText={setCodigo}
-          placeholder="EQ-XXXXXX"
+          onChangeText={(v) => { if (!modoAuto) setCodigo(v); }}
+          placeholder={modoAuto ? '' : 'Ej: AIR-ROD-01'}
           placeholderTextColor="#555"
           autoCapitalize="characters"
+          editable={!modoAuto}
         />
       </View>
 
@@ -474,4 +490,9 @@ const styles = StyleSheet.create({
   saveBtn:         { backgroundColor: '#E8500A', borderRadius: 4, padding: 16, alignItems: 'center', marginTop: 8 },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText:     { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1.5 },
+  toggleBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 4, borderWidth: 1, borderColor: '#1F1F1F', backgroundColor: 'rgba(255,255,255,0.04)' },
+  toggleBtnActive: { backgroundColor: '#E8500A', borderColor: '#E8500A' },
+  toggleBtnText:       { fontSize: 13, fontWeight: '600', color: '#888' },
+  toggleBtnTextActive: { color: '#fff' },
+  inputDisabled:   { opacity: 0.5 },
 });
