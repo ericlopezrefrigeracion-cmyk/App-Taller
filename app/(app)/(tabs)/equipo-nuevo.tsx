@@ -16,6 +16,12 @@ import api from '../../../lib/api';
 interface Rubro   { id: string; nombre: string; tipos: { id: string; nombre: string }[] }
 interface Marca   { id: string; nombre: string; modelos: { id: string; nombre: string }[] }
 interface Cliente { id: string; nombre: string | null; apellido: string | null; razon_social: string | null }
+interface Direccion { id: string; etiqueta: string | null; calle: string; numero: string | null; ciudad: string; es_principal: boolean }
+
+function labelDireccion(d: Direccion): string {
+  const partes = [d.calle, d.numero, d.ciudad].filter(Boolean).join(' ');
+  return d.etiqueta ? `${d.etiqueta}: ${partes}` : partes;
+}
 
 function nombreCliente(c: Cliente): string {
   if (c.razon_social) return c.razon_social;
@@ -188,9 +194,12 @@ export default function EquipoNuevoScreen() {
   const [numeroSerie, setNumeroSerie] = useState('');
   const [espacio,     setEspacio]     = useState('');
   const [notas,       setNotas]       = useState('');
-  const [saving,      setSaving]      = useState(false);
-  const [buscando,    setBuscando]    = useState(false);
-  const [showClientes, setShowClientes] = useState(false);
+  const [direcciones,    setDirecciones]    = useState<Direccion[]>([]);
+  const [direccionId,    setDireccionId]    = useState('');
+  const [loadingDirs,    setLoadingDirs]    = useState(false);
+  const [saving,         setSaving]         = useState(false);
+  const [buscando,       setBuscando]       = useState(false);
+  const [showClientes,   setShowClientes]   = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -225,9 +234,16 @@ export default function EquipoNuevoScreen() {
   const tiposDelRubro    = rubros.find((r) => r.id === rubroId)?.tipos ?? [];
   const modelosDeLaMarca = marcas.find((m) => m.id === marcaId)?.modelos ?? [];
 
-  function seleccionarCliente(c: Cliente) {
+  async function seleccionarCliente(c: Cliente) {
     setClienteId(c.id); setClienteQ(nombreCliente(c));
     setShowClientes(false); setClientes([]);
+    setDireccionId(''); setDirecciones([]);
+    setLoadingDirs(true);
+    try {
+      const { data } = await api.get(`/clientes/${c.id}`);
+      setDirecciones(data.data.direcciones ?? []);
+    } catch { /* silent */ }
+    finally { setLoadingDirs(false); }
   }
 
   function handleRubroChange(id: string) { setRubroId(id); setTipoId(''); }
@@ -263,6 +279,7 @@ export default function EquipoNuevoScreen() {
 
   async function handleGuardar() {
     if (!clienteId)      return Alert.alert('Falta dato', 'Seleccioná un cliente');
+    if (!direccionId)    return Alert.alert('Falta dato', 'Seleccioná una dirección');
     if (!tipoId)         return Alert.alert('Falta dato', 'Seleccioná el tipo de equipo');
     if (!modeloId)       return Alert.alert('Falta dato', 'Seleccioná marca y modelo');
     if (!codigo.trim())  return Alert.alert('Falta dato', 'El código interno es requerido');
@@ -271,6 +288,7 @@ export default function EquipoNuevoScreen() {
     try {
       await api.post('/equipos', {
         cliente_id:     clienteId,
+        direccion_id:   direccionId,
         tipo_id:        tipoId,
         modelo_id:      modeloId,
         codigo_interno: codigo.trim(),
@@ -289,9 +307,9 @@ export default function EquipoNuevoScreen() {
   }
 
   function resetForm() {
-    setClienteId(''); setClienteQ(''); setRubroId(''); setTipoId('');
-    setMarcaId(''); setModeloId(''); setCodigo(''); setModoAuto(false);
-    setNumeroSerie(''); setEspacio(''); setNotas('');
+    setClienteId(''); setClienteQ(''); setDireccionId(''); setDirecciones([]);
+    setRubroId(''); setTipoId(''); setMarcaId(''); setModeloId('');
+    setCodigo(''); setModoAuto(false); setNumeroSerie(''); setEspacio(''); setNotas('');
   }
 
   if (loadingCatalogo) {
@@ -342,6 +360,18 @@ export default function EquipoNuevoScreen() {
           </>
         )}
       </View>
+
+      {/* ── Dirección ── */}
+      {clienteId ? (
+        <Selector
+          label="Dirección *"
+          placeholder={loadingDirs ? 'Cargando direcciones...' : direcciones.length === 0 ? 'Sin direcciones registradas' : 'Seleccioná una dirección'}
+          options={direcciones.map(d => ({ id: d.id, nombre: labelDireccion(d) }))}
+          selectedId={direccionId}
+          onSelect={setDireccionId}
+          disabled={loadingDirs || direcciones.length === 0}
+        />
+      ) : null}
 
       {/* ── Rubro → Tipo ── */}
       <Selector

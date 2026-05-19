@@ -51,6 +51,24 @@ const TRANSICIONES: Record<EstadoOT, Transicion[]> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const NOTA_SEP = '\n---\n';
+
+function parseNotas(raw: string | null): { fecha: string; texto: string }[] {
+  if (!raw) return [];
+  return raw.split(NOTA_SEP).map(n => {
+    const match = n.match(/^\[(.+?)\] ([\s\S]*)$/);
+    if (match) return { fecha: match[1], texto: match[2] };
+    return { fecha: '', texto: n };
+  });
+}
+
+function fmtNow(): string {
+  return new Date().toLocaleString('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 function formatFecha(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -90,6 +108,10 @@ export default function OTDetailScreen() {
   const [notasEstado, setNotasEstado]   = useState('');
   const [firmadoPor, setFirmadoPor]     = useState('');
 
+  // Notas internas
+  const [nuevaNota,    setNuevaNota]    = useState('');
+  const [savingNota,   setSavingNota]   = useState(false);
+
   // Firma
   const [firmaVisible, setFirmaVisible] = useState(false);
   const sigRef = useRef<SignaturePadRef>(null);
@@ -122,6 +144,24 @@ export default function OTDetailScreen() {
       Alert.alert('Error', 'No se pudo guardar');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ── Notas internas ────────────────────────────────────────────────────────
+  async function handleAgregarNota() {
+    const texto = nuevaNota.trim();
+    if (!texto || !ot) return;
+    setSavingNota(true);
+    try {
+      const nueva = `[${fmtNow()}] ${texto}`;
+      const acumulada = ot.notas_internas ? `${ot.notas_internas}${NOTA_SEP}${nueva}` : nueva;
+      await api.patch(`/ots/${id}`, { notas_internas: acumulada });
+      setNuevaNota('');
+      await fetchOt();
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar la nota');
+    } finally {
+      setSavingNota(false);
     }
   }
 
@@ -294,12 +334,6 @@ export default function OTDetailScreen() {
             <Text style={styles.infoLabel}>Descripción</Text>
             <Text style={[styles.infoValue, { flex: 1 }]}>{ot.descripcion}</Text>
           </View>
-          {ot.notas_internas ? (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Notas</Text>
-              <Text style={[styles.infoValue, { flex: 1 }]}>{ot.notas_internas}</Text>
-            </View>
-          ) : null}
         </View>
 
         {/* ── 2. Cliente ──────────────────────────────────────────────── */}
@@ -428,7 +462,46 @@ export default function OTDetailScreen() {
           )}
         </View>
 
-        {/* ── 6. Items / Repuestos ────────────────────────────────────── */}
+        {/* ── 6. Notas internas ───────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notas internas</Text>
+
+          {parseNotas(ot.notas_internas).map((n, i) => (
+            <View key={i} style={styles.notaItem}>
+              {n.fecha ? <Text style={styles.notaFecha}>{n.fecha}</Text> : null}
+              <Text style={styles.notaTexto}>{n.texto}</Text>
+            </View>
+          ))}
+
+          {!ot.notas_internas && (
+            <Text style={styles.emptyText}>Sin notas</Text>
+          )}
+
+          {puedeEditar && (
+            <View style={{ marginTop: 12 }}>
+              <TextInput
+                style={[styles.textarea, { minHeight: 70 }]}
+                value={nuevaNota}
+                onChangeText={setNuevaNota}
+                placeholder="Nueva nota..."
+                placeholderTextColor="#555"
+                multiline
+                numberOfLines={3}
+              />
+              <TouchableOpacity
+                style={[styles.secondaryBtn, (!nuevaNota.trim() || savingNota) && styles.saveBtnDisabled, { marginTop: 8 }]}
+                onPress={handleAgregarNota}
+                disabled={!nuevaNota.trim() || savingNota}
+              >
+                {savingNota
+                  ? <ActivityIndicator color="#E8500A" size="small" />
+                  : <Text style={styles.secondaryBtnText}>+ AGREGAR NOTA</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* ── 7. Items / Repuestos ────────────────────────────────────── */}
         {ot.items.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Repuestos / Materiales</Text>
@@ -1008,6 +1081,22 @@ const styles = StyleSheet.create({
     color: '#666666',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+
+  // Notas internas
+  notaItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F1F1F',
+    gap: 2,
+  },
+  notaFecha: {
+    fontSize: 11,
+    color: '#555555',
+  },
+  notaTexto: {
+    fontSize: 14,
+    color: '#F5F5F5',
   },
 
   // Historial
