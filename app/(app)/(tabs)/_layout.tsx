@@ -36,6 +36,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="mantenimiento"
+        options={{
+          title: 'Mantenimiento',
+          tabBarIcon: () => <Icon label="🔩" />,
+        }}
+      />
+      <Tabs.Screen
         name="fichaje"
         options={{
           title: 'Fichaje',
