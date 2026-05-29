@@ -16,6 +16,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../../../lib/api';
+import { getUser } from '../../../lib/auth';
 import { buildFileUrl } from '../../../lib/types';
 import type {
   OrdenTrabajo,
@@ -53,12 +54,17 @@ const TRANSICIONES: Record<EstadoOT, Transicion[]> = {
 
 const NOTA_SEP = '\n---\n';
 
-function parseNotas(raw: string | null): { fecha: string; texto: string }[] {
+function parseNotas(raw: string | null): { fecha: string; autor: string; texto: string }[] {
   if (!raw) return [];
   return raw.split(NOTA_SEP).map(n => {
     const match = n.match(/^\[(.+?)\] ([\s\S]*)$/);
-    if (match) return { fecha: match[1], texto: match[2] };
-    return { fecha: '', texto: n };
+    if (match) {
+      const header = match[1]; // "DD/MM/YYYY HH:MM | Nombre" o solo "DD/MM/YYYY HH:MM"
+      const sep = header.indexOf(' | ');
+      if (sep !== -1) return { fecha: header.slice(0, sep), autor: header.slice(sep + 3), texto: match[2] };
+      return { fecha: header, autor: '', texto: match[2] };
+    }
+    return { fecha: '', autor: '', texto: n };
   });
 }
 
@@ -153,7 +159,10 @@ export default function OTDetailScreen() {
     if (!texto || !ot) return;
     setSavingNota(true);
     try {
-      const nueva = `[${fmtNow()}] ${texto}`;
+      const user = await getUser();
+      const autorNombre = [user?.nombre, user?.apellido].filter(Boolean).join(' ') || user?.email || '';
+      const header = autorNombre ? `${fmtNow()} | ${autorNombre}` : fmtNow();
+      const nueva = `[${header}] ${texto}`;
       const acumulada = ot.notas_internas ? `${ot.notas_internas}${NOTA_SEP}${nueva}` : nueva;
       await api.patch(`/ots/${id}`, { notas_internas: acumulada });
       setNuevaNota('');
@@ -468,7 +477,12 @@ export default function OTDetailScreen() {
 
           {parseNotas(ot.notas_internas).map((n, i) => (
             <View key={i} style={styles.notaItem}>
-              {n.fecha ? <Text style={styles.notaFecha}>{n.fecha}</Text> : null}
+              {(n.fecha || n.autor) ? (
+                <View style={styles.notaHeader}>
+                  {n.fecha ? <Text style={styles.notaFecha}>{n.fecha}</Text> : null}
+                  {n.autor ? <Text style={styles.notaAutor}>{n.autor}</Text> : null}
+                </View>
+              ) : null}
               <Text style={styles.notaTexto}>{n.texto}</Text>
             </View>
           ))}
@@ -1088,11 +1102,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#1F1F1F',
-    gap: 2,
+    gap: 3,
+  },
+  notaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   notaFecha: {
     fontSize: 11,
     color: '#555555',
+  },
+  notaAutor: {
+    fontSize: 11,
+    color: '#E8500A',
+    fontWeight: '600',
   },
   notaTexto: {
     fontSize: 14,
