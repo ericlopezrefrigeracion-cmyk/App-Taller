@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,6 +30,16 @@ import type {
 } from '../../../lib/types';
 import EstadoBadge from '../../../components/EstadoBadge';
 import SignaturePad, { SignaturePadRef } from '../../../components/SignaturePad';
+
+// ─── Tipos locales ────────────────────────────────────────────────────────────
+
+interface ProductoBusqueda {
+  id: string;
+  nombre: string;
+  codigo: string | null;
+  tipo: string;
+  unidad: string;
+}
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -124,6 +137,17 @@ export default function OTDetailScreen() {
   const [notasCierre,  setNotasCierre]  = useState('');
   const sigRef = useRef<SignaturePadRef>(null);
 
+  // Modal agregar item
+  const [itemModalVisible,    setItemModalVisible]    = useState(false);
+  const [busquedaProducto,    setBusquedaProducto]    = useState('');
+  const [resultadosProducto,  setResultadosProducto]  = useState<ProductoBusqueda[]>([]);
+  const [buscandoProducto,    setBuscandoProducto]    = useState(false);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoBusqueda | null>(null);
+  const [cantidadItem,        setCantidadItem]        = useState('1');
+  const [notasItem,           setNotasItem]           = useState('');
+  const [guardandoItem,       setGuardandoItem]       = useState(false);
+  const busquedaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fetchOt = useCallback(async () => {
     try {
       const { data } = await api.get<{ data: OrdenTrabajo }>(`/ots/${id}`);
@@ -140,6 +164,70 @@ export default function OTDetailScreen() {
   }, [id]);
 
   useEffect(() => { fetchOt(); }, [fetchOt]);
+
+  // ── Items ──────────────────────────────────────────────────────────────────
+
+  function handleBusquedaChange(text: string) {
+    setBusquedaProducto(text);
+    setProductoSeleccionado(null);
+    if (busquedaTimer.current) clearTimeout(busquedaTimer.current);
+    if (!text.trim()) { setResultadosProducto([]); return; }
+    busquedaTimer.current = setTimeout(async () => {
+      setBuscandoProducto(true);
+      try {
+        const { data } = await api.get(`/productos?q=${encodeURIComponent(text)}&limit=20`);
+        setResultadosProducto(data.data ?? []);
+      } catch { setResultadosProducto([]); }
+      finally { setBuscandoProducto(false); }
+    }, 350);
+  }
+
+  function abrirModalItem() {
+    setBusquedaProducto('');
+    setResultadosProducto([]);
+    setProductoSeleccionado(null);
+    setCantidadItem('1');
+    setNotasItem('');
+    setItemModalVisible(true);
+  }
+
+  async function confirmarAgregarItem() {
+    if (!productoSeleccionado) return;
+    const qty = parseInt(cantidadItem, 10);
+    if (isNaN(qty) || qty < 1) {
+      Alert.alert('Cantidad inválida', 'Ingresá una cantidad mayor a 0.');
+      return;
+    }
+    setGuardandoItem(true);
+    try {
+      await api.post(`/ots/${id}/items`, {
+        producto_id: productoSeleccionado.id,
+        cantidad:    qty,
+        notas:       notasItem.trim() || null,
+      });
+      setItemModalVisible(false);
+      await fetchOt();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error ?? 'No se pudo agregar el artículo');
+    } finally { setGuardandoItem(false); }
+  }
+
+  async function eliminarItem(itemId: string) {
+    Alert.alert('Eliminar artículo', '¿Querés eliminar este artículo de la OT?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar', style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/ots/${id}/items/${itemId}`);
+            await fetchOt();
+          } catch {
+            Alert.alert('Error', 'No se pudo eliminar el artículo');
+          }
+        },
+      },
+    ]);
+  }
 
   // ── Guardar diagnóstico / trabajo realizado ────────────────────────────────
   async function handleGuardarDiagnostico() {
@@ -572,10 +660,19 @@ export default function OTDetailScreen() {
         </View>
 
         {/* ── 7. Items / Repuestos ────────────────────────────────────── */}
-        {ot.items.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Repuestos / Materiales</Text>
-            {ot.items.map((item) => (
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Repuestos / Materiales</Text>
+            {puedeEditar && (
+              <TouchableOpacity onPress={abrirModalItem} style={styles.addItemBtn}>
+                <Text style={styles.addItemBtnText}>+ Agregar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {ot.items.length === 0 ? (
+            <Text style={styles.emptyText}>Sin artículos cargados</Text>
+          ) : (
+            ot.items.map((item) => (
               <View key={item.id} style={styles.itemRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemNombre}>{item.producto.nombre}</Text>
@@ -585,10 +682,15 @@ export default function OTDetailScreen() {
                   {item.notas && <Text style={styles.itemNotas}>{item.notas}</Text>}
                 </View>
                 <Text style={styles.itemCantidad}>×{item.cantidad}</Text>
+                {puedeEditar && (
+                  <TouchableOpacity onPress={() => eliminarItem(item.id)} style={styles.itemDeleteBtn}>
+                    <Text style={styles.itemDeleteBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            ))}
-          </View>
-        )}
+            ))
+          )}
+        </View>
 
         {/* ── 7. Checklist ────────────────────────────────────────────── */}
         {(() => {
@@ -705,6 +807,105 @@ export default function OTDetailScreen() {
         )}
 
       </ScrollView>
+
+      {/* ─── Modal agregar artículo ────────────────────────────────── */}
+      <Modal visible={itemModalVisible} transparent animationType="slide" onRequestClose={() => setItemModalVisible(false)}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalBox, { maxHeight: '85%' }]}>
+              <Text style={styles.modalTitle}>Agregar artículo / servicio</Text>
+
+              {productoSeleccionado ? (
+                /* ── Paso 2: producto elegido ── */
+                <View>
+                  <View style={styles.productoSelectedBox}>
+                    <Text style={styles.productoSelectedNombre}>{productoSeleccionado.nombre}</Text>
+                    {productoSeleccionado.codigo && (
+                      <Text style={styles.itemCodigo}>COD: {productoSeleccionado.codigo}</Text>
+                    )}
+                    <TouchableOpacity onPress={() => setProductoSeleccionado(null)} style={{ marginTop: 6 }}>
+                      <Text style={{ color: '#888', fontSize: 12 }}>Cambiar producto</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.inputLabel}>Cantidad</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={cantidadItem}
+                    onChangeText={setCantidadItem}
+                    keyboardType="numeric"
+                    placeholder="1"
+                    placeholderTextColor="#555"
+                  />
+
+                  <Text style={styles.inputLabel}>Notas (opcional)</Text>
+                  <TextInput
+                    style={[styles.input, { minHeight: 60 }]}
+                    value={notasItem}
+                    onChangeText={setNotasItem}
+                    placeholder="Ej: reemplazado por garantía"
+                    placeholderTextColor="#555"
+                    multiline
+                  />
+                </View>
+              ) : (
+                /* ── Paso 1: buscar producto ── */
+                <View>
+                  <TextInput
+                    style={styles.input}
+                    value={busquedaProducto}
+                    onChangeText={handleBusquedaChange}
+                    placeholder="Buscar por nombre o código…"
+                    placeholderTextColor="#555"
+                    autoFocus
+                  />
+                  {buscandoProducto && (
+                    <ActivityIndicator color="#E8500A" style={{ marginVertical: 8 }} />
+                  )}
+                  {!buscandoProducto && resultadosProducto.length === 0 && busquedaProducto.trim().length > 1 && (
+                    <Text style={{ color: '#666', fontSize: 13, textAlign: 'center', marginVertical: 8 }}>Sin resultados</Text>
+                  )}
+                  <FlatList
+                    data={resultadosProducto}
+                    keyExtractor={p => p.id}
+                    style={{ maxHeight: 250 }}
+                    keyboardShouldPersistTaps="handled"
+                    renderItem={({ item: p }) => (
+                      <TouchableOpacity
+                        style={styles.productoResultRow}
+                        onPress={() => { setProductoSeleccionado(p); setBusquedaProducto(p.nombre); }}
+                      >
+                        <Text style={styles.productoResultNombre}>{p.nombre}</Text>
+                        <Text style={styles.productoResultMeta}>
+                          {p.tipo === 'servicio' ? 'Servicio' : 'Producto'}{p.codigo ? ` · ${p.codigo}` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+
+              <View style={[styles.modalActions, { marginTop: 16 }]}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setItemModalVisible(false)}>
+                  <Text style={styles.cancelBtnText}>CANCELAR</Text>
+                </TouchableOpacity>
+                {productoSeleccionado && (
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, guardandoItem && { opacity: 0.6 }]}
+                    onPress={confirmarAgregarItem}
+                    disabled={guardandoItem}
+                  >
+                    <Text style={styles.confirmBtnText}>{guardandoItem ? 'GUARDANDO…' : 'AGREGAR'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ─── Modal cambio de estado (suspender / retomar) ──────────── */}
       <Modal visible={modalVisible} transparent animationType="slide">
@@ -1039,6 +1240,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 8,
+  },
+
+  // Items — botón agregar
+  addItemBtn: {
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#E8500A',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  addItemBtnText: {
+    color: '#E8500A',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  itemDeleteBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  itemDeleteBtnText: {
+    color: '#666',
+    fontSize: 14,
+  },
+
+  // Modal agregar item — búsqueda
+  productoResultRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F1F1F',
+  },
+  productoResultNombre: {
+    fontSize: 14,
+    color: '#F5F5F5',
+    fontWeight: '500',
+  },
+  productoResultMeta: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  productoSelectedBox: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E8500A',
+  },
+  productoSelectedNombre: {
+    fontSize: 15,
+    color: '#F5F5F5',
+    fontWeight: '600',
+  },
+  inputLabel: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
   // Items
