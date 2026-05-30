@@ -108,7 +108,7 @@ export default function OTDetailScreen() {
   const [trabajoRealizado, setTrabajoRealizado] = useState('');
   const [editDirty, setEditDirty]               = useState(false);
 
-  // Modal cambio de estado
+  // Modal cambio de estado (para transiciones que NO son cerrar)
   const [modalVisible, setModalVisible] = useState(false);
   const [transicion, setTransicion]     = useState<Transicion | null>(null);
   const [notasEstado, setNotasEstado]   = useState('');
@@ -118,8 +118,10 @@ export default function OTDetailScreen() {
   const [nuevaNota,    setNuevaNota]    = useState('');
   const [savingNota,   setSavingNota]   = useState(false);
 
-  // Firma
+  // Firma (y cierre integrado)
   const [firmaVisible, setFirmaVisible] = useState(false);
+  const [cerrando,     setCerrando]     = useState(false);
+  const [notasCierre,  setNotasCierre]  = useState('');
   const sigRef = useRef<SignaturePadRef>(null);
 
   const fetchOt = useCallback(async () => {
@@ -176,9 +178,39 @@ export default function OTDetailScreen() {
 
   // ── Cambio de estado ───────────────────────────────────────────────────────
   function abrirModalEstado(t: Transicion) {
+    if (!ot) return;
+
+    if (t.estado === 'cerrada') {
+      // Validar al menos 2 fotos
+      if (ot.fotos.length < 2) {
+        Alert.alert(
+          'Fotos insuficientes',
+          `Se necesitan al menos 2 fotos para cerrar la OT.\nActualmente hay ${ot.fotos.length}.`,
+        );
+        return;
+      }
+      // Validar tareas obligatorias completadas
+      const pendientes = ot.checklist
+        .flatMap(cl => cl.tareas)
+        .filter(tarea => tarea.obligatoria && !tarea.completada);
+      if (pendientes.length > 0) {
+        Alert.alert(
+          'Tareas obligatorias pendientes',
+          `Completá las ${pendientes.length} tarea(s) obligatoria(s) antes de cerrar la OT.`,
+        );
+        return;
+      }
+      // Abrir flujo de cierre con firma integrada
+      setCerrando(true);
+      setFirmadoPor('');
+      setNotasCierre('');
+      setFirmaVisible(true);
+      return;
+    }
+
+    // Resto de transiciones (suspender, retomar, etc.)
     setTransicion(t);
     setNotasEstado('');
-    setFirmadoPor('');
     setModalVisible(true);
   }
 
@@ -186,16 +218,10 @@ export default function OTDetailScreen() {
     if (!transicion) return;
     setSaving(true);
     try {
-      const body: Record<string, string> = {
+      await api.patch(`/ots/${id}/estado`, {
         estado: transicion.estado,
         notas:  notasEstado,
-      };
-      if (transicion.estado === 'cerrada') {
-        body.trabajo_realizado = trabajoRealizado;
-        body.firmado_por       = firmadoPor;
-        body.firma_cliente     = 'app-tecnico-pending';
-      }
-      await api.patch(`/ots/${id}/estado`, body);
+      });
       setModalVisible(false);
       await fetchOt();
     } catch (e: any) {
@@ -284,20 +310,37 @@ export default function OTDetailScreen() {
     }
   }
 
-  // ── Firma ─────────────────────────────────────────────────────────────────
+  // ── Firma (también maneja el cierre de OT con firma integrada) ───────────
   async function handleGuardarFirma() {
     if (!sigRef.current || sigRef.current.isEmpty()) {
-      Alert.alert('Firma vacía', 'Dibujá la firma antes de confirmar');
+      Alert.alert('Firma vacía', 'El cliente debe firmar antes de confirmar.');
+      return;
+    }
+    if (cerrando && !trabajoRealizado.trim()) {
+      Alert.alert('Campo requerido', 'Completá la descripción del trabajo realizado.');
       return;
     }
     const dataURL = sigRef.current.toDataURL();
     setSaving(true);
     try {
-      await api.patch(`/ots/${id}/firma`, { firma_cliente: dataURL, firmado_por: firmadoPor });
+      if (cerrando) {
+        // 1. Cambiar estado a cerrada
+        await api.patch(`/ots/${id}/estado`, {
+          estado:            'cerrada',
+          trabajo_realizado: trabajoRealizado,
+          notas:             notasCierre,
+          firmado_por:       firmadoPor,
+        });
+        // 2. Guardar firma del cliente
+        await api.patch(`/ots/${id}/firma`, { firma_cliente: dataURL, firmado_por: firmadoPor });
+        setCerrando(false);
+      } else {
+        await api.patch(`/ots/${id}/firma`, { firma_cliente: dataURL, firmado_por: firmadoPor });
+      }
       setFirmaVisible(false);
       await fetchOt();
-    } catch {
-      Alert.alert('Error', 'No se pudo guardar la firma');
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error ?? e.response?.data?.message ?? 'No se pudo guardar');
     } finally {
       setSaving(false);
     }
@@ -535,20 +578,36 @@ export default function OTDetailScreen() {
         )}
 
         {/* ── 7. Checklist ────────────────────────────────────────────── */}
-        {ot.checklist.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Checklist</Text>
-            {ot.checklist.map((cl) => (
-              <ChecklistSection
-                key={cl.id}
-                checklist={cl}
-                otId={id}
-                canToggle={puedeEditar}
-                onToggle={toggleTarea}
-              />
-            ))}
-          </View>
-        )}
+        {(() => {
+          const oblPendientes = ot.checklist
+            .flatMap(cl => cl.tareas)
+            .filter(t => t.obligatoria && !t.completada).length;
+          return (
+            <View style={styles.section}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Checklist de tareas</Text>
+                {oblPendientes > 0 && (
+                  <View style={styles.obligBadge}>
+                    <Text style={styles.obligBadgeText}>⚠ {oblPendientes} OBLIG.</Text>
+                  </View>
+                )}
+              </View>
+              {ot.checklist.length === 0 ? (
+                <Text style={styles.emptyText}>Sin tareas asignadas en esta OT</Text>
+              ) : (
+                ot.checklist.map((cl) => (
+                  <ChecklistSection
+                    key={cl.id}
+                    checklist={cl}
+                    otId={id}
+                    canToggle={puedeEditar}
+                    onToggle={toggleTarea}
+                  />
+                ))
+              )}
+            </View>
+          );
+        })()}
 
         {/* ── 8a. Fotos ───────────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -634,36 +693,13 @@ export default function OTDetailScreen() {
 
       </ScrollView>
 
-      {/* ─── Modal cambio de estado ────────────────────────────────── */}
+      {/* ─── Modal cambio de estado (suspender / retomar) ──────────── */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>
               {transicion?.label ?? 'Cambiar estado'}
             </Text>
-
-            {transicion?.estado === 'cerrada' && (
-              <>
-                <Text style={styles.fieldLabel}>Trabajo realizado *</Text>
-                <TextInput
-                  style={[styles.textarea, { marginBottom: 12 }]}
-                  value={trabajoRealizado}
-                  onChangeText={setTrabajoRealizado}
-                  placeholder="Descripción del trabajo..."
-                  placeholderTextColor="#555"
-                  multiline
-                  numberOfLines={3}
-                />
-                <Text style={styles.fieldLabel}>Firmado por (nombre cliente)</Text>
-                <TextInput
-                  style={[styles.input, { marginBottom: 12 }]}
-                  value={firmadoPor}
-                  onChangeText={setFirmadoPor}
-                  placeholder="Nombre del cliente"
-                  placeholderTextColor="#555"
-                />
-              </>
-            )}
 
             <Text style={styles.fieldLabel}>Notas (opcional)</Text>
             <TextInput
@@ -697,18 +733,50 @@ export default function OTDetailScreen() {
         </View>
       </Modal>
 
-      {/* ─── Modal firma ───────────────────────────────────────────── */}
+      {/* ─── Modal firma / cierre ──────────────────────────────────── */}
       <Modal visible={firmaVisible} animationType="slide">
         <View style={styles.firmaModal}>
           <View style={styles.firmaModalHeader}>
-            <Text style={styles.firmaModalTitle}>Firma del cliente</Text>
-            <TouchableOpacity onPress={() => setFirmaVisible(false)}>
+            <Text style={styles.firmaModalTitle}>
+              {cerrando ? 'Cerrar OT — Firma del cliente' : 'Firma del cliente'}
+            </Text>
+            <TouchableOpacity onPress={() => { setFirmaVisible(false); setCerrando(false); }}>
               <Text style={styles.firmaModalClose}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.fieldLabel, { paddingHorizontal: 16, marginBottom: 8 }]}>
-            Firmado por
+          {/* Campos adicionales solo al cerrar */}
+          {cerrando && (
+            <>
+              <Text style={[styles.fieldLabel, { paddingHorizontal: 16, marginBottom: 6, marginTop: 12 }]}>
+                TRABAJO REALIZADO *
+              </Text>
+              <TextInput
+                style={[styles.textarea, { marginHorizontal: 16, marginBottom: 10 }]}
+                value={trabajoRealizado}
+                onChangeText={v => { setTrabajoRealizado(v); setEditDirty(false); }}
+                placeholder="Descripción del trabajo ejecutado..."
+                placeholderTextColor="#555"
+                multiline
+                numberOfLines={3}
+              />
+              <Text style={[styles.fieldLabel, { paddingHorizontal: 16, marginBottom: 6 }]}>
+                NOTAS DE CIERRE (opcional)
+              </Text>
+              <TextInput
+                style={[styles.textarea, { marginHorizontal: 16, marginBottom: 10 }]}
+                value={notasCierre}
+                onChangeText={setNotasCierre}
+                placeholder="Observaciones del cierre..."
+                placeholderTextColor="#555"
+                multiline
+                numberOfLines={2}
+              />
+            </>
+          )}
+
+          <Text style={[styles.fieldLabel, { paddingHorizontal: 16, marginBottom: 8, marginTop: cerrando ? 0 : 12 }]}>
+            FIRMADO POR (nombre cliente)
           </Text>
           <TextInput
             style={[styles.input, { marginHorizontal: 16, marginBottom: 12 }]}
@@ -721,7 +789,7 @@ export default function OTDetailScreen() {
           <View style={styles.firmaCanvas}>
             <SignaturePad ref={sigRef} />
           </View>
-          <Text style={styles.firmaHint}>Dibuje la firma en el área blanca</Text>
+          <Text style={styles.firmaHint}>El cliente dibuja su firma en el área blanca</Text>
 
           <View style={styles.firmaActions}>
             <TouchableOpacity
@@ -737,7 +805,9 @@ export default function OTDetailScreen() {
             >
               {saving
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.confirmBtnText}>GUARDAR FIRMA</Text>}
+                : <Text style={styles.confirmBtnText}>
+                    {cerrando ? 'CERRAR OT' : 'GUARDAR FIRMA'}
+                  </Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -776,9 +846,14 @@ function ChecklistSection({ checklist, otId, canToggle, onToggle }: ChecklistSec
             <View style={[styles.tareaCheck, tarea.completada && styles.tareaCheckDone]}>
               {tarea.completada && <Text style={styles.tareaCheckMark}>✓</Text>}
             </View>
-            <Text style={[styles.tareaDesc, tarea.completada && styles.tareaDescDone]}>
-              {tarea.nombre}
-            </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.tareaDesc, tarea.completada && styles.tareaDescDone]}>
+                {tarea.nombre}
+              </Text>
+              {tarea.obligatoria && !tarea.completada && (
+                <Text style={styles.tareaObligatoria}>OBLIGATORIA</Text>
+              )}
+            </View>
           </TouchableOpacity>
         ))}
     </View>
@@ -1147,6 +1222,25 @@ const styles = StyleSheet.create({
   historialUsuario: {
     fontSize: 12,
     color: '#555555',
+  },
+
+  // Checklist — obligatoria
+  obligBadge: {
+    backgroundColor: '#3D1A00',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  obligBadgeText: {
+    color: '#E8500A',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  tareaObligatoria: {
+    fontSize: 10,
+    color: '#E8500A',
+    fontWeight: '600',
+    marginTop: 2,
   },
 
   // Modal estado
