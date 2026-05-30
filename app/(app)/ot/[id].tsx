@@ -181,6 +181,19 @@ export default function OTDetailScreen() {
     if (!ot) return;
 
     if (t.estado === 'cerrada') {
+      // Validar cliente, equipo y fecha completos
+      if (!ot.cliente) {
+        Alert.alert('Cliente requerido', 'La OT debe tener un cliente asignado antes de cerrar.');
+        return;
+      }
+      if (!ot.equipo) {
+        Alert.alert('Equipo requerido', 'La OT debe tener un equipo asignado antes de cerrar.');
+        return;
+      }
+      if (!ot.fecha_programada) {
+        Alert.alert('Fecha requerida', 'La OT debe tener una fecha programada antes de cerrar.');
+        return;
+      }
       // Validar al menos 2 fotos
       if (ot.fotos.length < 2) {
         Alert.alert(
