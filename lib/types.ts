@@ -42,6 +42,7 @@ export interface EquipoResumen {
 }
 
 export interface OTDireccion {
+  id: string;
   calle: string;
   numero: string | null;
   ciudad: string;

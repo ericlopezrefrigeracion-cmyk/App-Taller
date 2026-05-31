@@ -190,8 +190,9 @@ export default function OTDetailScreen() {
     equipoTimer.current = setTimeout(async () => {
       setBuscandoEquipo(true);
       try {
-        const clienteId = ot?.cliente?.id ? `&cliente_id=${ot.cliente.id}` : '';
-        const { data } = await api.get(`/equipos?q=${encodeURIComponent(text)}&limit=20${clienteId}`);
+        const clienteId   = ot?.cliente?.id    ? `&cliente_id=${ot.cliente.id}`       : '';
+        const direccionId = ot?.direccion?.id  ? `&direccion_id=${ot.direccion.id}` : '';
+        const { data } = await api.get(`/equipos?q=${encodeURIComponent(text)}&limit=20${clienteId}${direccionId}`);
         setResultadosEquipo(data.data?.items ?? []);
       } catch { setResultadosEquipo([]); }
       finally { setBuscandoEquipo(false); }
@@ -878,7 +879,9 @@ export default function OTDetailScreen() {
                 {ot?.equipo ? 'Cambiar equipo' : 'Asignar equipo'}
               </Text>
               <Text style={{ color: '#666', fontSize: 12, marginBottom: 10 }}>
-                {ot?.cliente ? `Mostrando equipos de ${ot.cliente.razon_social ?? [ot.cliente.nombre, ot.cliente.apellido].filter(Boolean).join(' ')}` : 'Buscá por código, N/S o ubicación'}
+                {ot?.cliente
+                  ? `Cliente: ${ot.cliente.razon_social ?? [ot.cliente.nombre, ot.cliente.apellido].filter(Boolean).join(' ')}${ot.direccion ? ` · ${ot.direccion.calle}${ot.direccion.ciudad ? ', ' + ot.direccion.ciudad : ''}` : ''}`
+                  : 'Buscá por código, N/S o ubicación'}
               </Text>
 
               <TextInput
