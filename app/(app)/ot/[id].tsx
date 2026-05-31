@@ -41,6 +41,14 @@ interface ProductoBusqueda {
   unidad: string;
 }
 
+interface EquipoBusqueda {
+  id: string;
+  codigo_interno: string;
+  espacio: string | null;
+  tipo: { nombre: string } | null;
+  modelo: { nombre: string; marca: { nombre: string } } | null;
+}
+
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TIPO_LABEL: Record<string, string> = {
@@ -137,6 +145,14 @@ export default function OTDetailScreen() {
   const [notasCierre,  setNotasCierre]  = useState('');
   const sigRef = useRef<SignaturePadRef>(null);
 
+  // Modal asignar equipo
+  const [equipoModalVisible,   setEquipoModalVisible]   = useState(false);
+  const [busquedaEquipo,       setBusquedaEquipo]       = useState('');
+  const [resultadosEquipo,     setResultadosEquipo]     = useState<EquipoBusqueda[]>([]);
+  const [buscandoEquipo,       setBuscandoEquipo]       = useState(false);
+  const [asignandoEquipo,      setAsignandoEquipo]      = useState(false);
+  const equipoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Modal agregar item
   const [itemModalVisible,    setItemModalVisible]    = useState(false);
   const [busquedaProducto,    setBusquedaProducto]    = useState('');
@@ -164,6 +180,40 @@ export default function OTDetailScreen() {
   }, [id]);
 
   useEffect(() => { fetchOt(); }, [fetchOt]);
+
+  // ── Equipo ─────────────────────────────────────────────────────────────────
+
+  function handleBusquedaEquipoChange(text: string) {
+    setBusquedaEquipo(text);
+    if (equipoTimer.current) clearTimeout(equipoTimer.current);
+    if (!text.trim()) { setResultadosEquipo([]); return; }
+    equipoTimer.current = setTimeout(async () => {
+      setBuscandoEquipo(true);
+      try {
+        const clienteId = ot?.cliente?.id ? `&cliente_id=${ot.cliente.id}` : '';
+        const { data } = await api.get(`/equipos?q=${encodeURIComponent(text)}&limit=20${clienteId}`);
+        setResultadosEquipo(data.data?.items ?? []);
+      } catch { setResultadosEquipo([]); }
+      finally { setBuscandoEquipo(false); }
+    }, 350);
+  }
+
+  function abrirModalEquipo() {
+    setBusquedaEquipo('');
+    setResultadosEquipo([]);
+    setEquipoModalVisible(true);
+  }
+
+  async function asignarEquipo(equipo: EquipoBusqueda) {
+    setAsignandoEquipo(true);
+    try {
+      await api.patch(`/ots/${id}`, { equipo_id: equipo.id });
+      setEquipoModalVisible(false);
+      await fetchOt();
+    } catch (e: any) {
+      Alert.alert('Error', e.response?.data?.error ?? 'No se pudo asignar el equipo');
+    } finally { setAsignandoEquipo(false); }
+  }
 
   // ── Items ──────────────────────────────────────────────────────────────────
 
@@ -518,34 +568,45 @@ export default function OTDetailScreen() {
         </View>
 
         {/* ── 3. Equipo ───────────────────────────────────────────────── */}
-        {ot.equipo ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Equipo</Text>
-
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Marca / Modelo</Text>
-              <Text style={styles.infoValue}>
-                {ot.equipo.modelo?.marca?.nombre ?? ''} {ot.equipo.modelo?.nombre ?? ''}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Tipo</Text>
-              <Text style={styles.infoValue}>{ot.equipo.tipo?.nombre ?? '—'}</Text>
-            </View>
-            {ot.equipo.numero_serie ? (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>N/S</Text>
-                <Text style={styles.infoValue}>{ot.equipo.numero_serie}</Text>
-              </View>
-            ) : null}
-            {ot.equipo.espacio ? (
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Ubicación</Text>
-                <Text style={[styles.infoValue, { flex: 1 }]}>{ot.equipo.espacio}</Text>
-              </View>
-            ) : null}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Equipo</Text>
+            {puedeEditar && (
+              <TouchableOpacity onPress={abrirModalEquipo} style={styles.addItemBtn}>
+                <Text style={styles.addItemBtnText}>{ot.equipo ? 'Cambiar' : '+ Asignar'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        ) : null}
+
+          {ot.equipo ? (
+            <>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Marca / Modelo</Text>
+                <Text style={styles.infoValue}>
+                  {ot.equipo.modelo?.marca?.nombre ?? ''} {ot.equipo.modelo?.nombre ?? ''}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Tipo</Text>
+                <Text style={styles.infoValue}>{ot.equipo.tipo?.nombre ?? '—'}</Text>
+              </View>
+              {ot.equipo.numero_serie ? (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>N/S</Text>
+                  <Text style={styles.infoValue}>{ot.equipo.numero_serie}</Text>
+                </View>
+              ) : null}
+              {ot.equipo.espacio ? (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Ubicación</Text>
+                  <Text style={[styles.infoValue, { flex: 1 }]}>{ot.equipo.espacio}</Text>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <Text style={styles.emptyText}>Sin equipo asignado</Text>
+          )}
+        </View>
 
         {/* ── 4. Estado ───────────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -807,6 +868,63 @@ export default function OTDetailScreen() {
         )}
 
       </ScrollView>
+
+      {/* ─── Modal asignar equipo ──────────────────────────────────── */}
+      <Modal visible={equipoModalVisible} transparent animationType="slide" onRequestClose={() => setEquipoModalVisible(false)}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalBox, { maxHeight: '85%' }]}>
+              <Text style={styles.modalTitle}>
+                {ot?.equipo ? 'Cambiar equipo' : 'Asignar equipo'}
+              </Text>
+              <Text style={{ color: '#666', fontSize: 12, marginBottom: 10 }}>
+                {ot?.cliente ? `Mostrando equipos de ${ot.cliente.razon_social ?? [ot.cliente.nombre, ot.cliente.apellido].filter(Boolean).join(' ')}` : 'Buscá por código, N/S o ubicación'}
+              </Text>
+
+              <TextInput
+                style={styles.input}
+                value={busquedaEquipo}
+                onChangeText={handleBusquedaEquipoChange}
+                placeholder="Buscar equipo…"
+                placeholderTextColor="#555"
+                autoFocus
+              />
+
+              {buscandoEquipo && <ActivityIndicator color="#E8500A" style={{ marginVertical: 8 }} />}
+              {!buscandoEquipo && resultadosEquipo.length === 0 && busquedaEquipo.trim().length > 1 && (
+                <Text style={{ color: '#666', fontSize: 13, textAlign: 'center', marginVertical: 8 }}>Sin resultados</Text>
+              )}
+
+              <FlatList
+                data={resultadosEquipo}
+                keyExtractor={e => e.id}
+                style={{ maxHeight: 300 }}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item: eq }) => (
+                  <TouchableOpacity
+                    style={[styles.productoResultRow, asignandoEquipo && { opacity: 0.5 }]}
+                    onPress={() => asignarEquipo(eq)}
+                    disabled={asignandoEquipo}
+                  >
+                    <Text style={styles.productoResultNombre}>
+                      {eq.modelo ? `${eq.modelo.marca.nombre} ${eq.modelo.nombre}` : eq.codigo_interno}
+                    </Text>
+                    <Text style={styles.productoResultMeta}>
+                      {[eq.tipo?.nombre, eq.espacio, eq.codigo_interno].filter(Boolean).join(' · ')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+
+              <View style={[styles.modalActions, { marginTop: 16 }]}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEquipoModalVisible(false)}>
+                  <Text style={styles.cancelBtnText}>CANCELAR</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ─── Modal agregar artículo ────────────────────────────────── */}
       <Modal visible={itemModalVisible} transparent animationType="slide" onRequestClose={() => setItemModalVisible(false)}>
