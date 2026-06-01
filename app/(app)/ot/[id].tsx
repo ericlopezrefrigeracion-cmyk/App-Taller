@@ -60,7 +60,7 @@ const TIPO_LABEL: Record<string, string> = {
 type Transicion = { label: string; estado: EstadoOT };
 
 const TRANSICIONES: Record<EstadoOT, Transicion[]> = {
-  borrador:           [],
+  borrador:           [{ label: 'Iniciar trabajo', estado: 'en_curso' }],
   asignada:           [{ label: 'Iniciar trabajo', estado: 'en_curso' }],
   en_curso:           [
     { label: 'Suspender — falta repuesto', estado: 'pendiente_repuesto' },
