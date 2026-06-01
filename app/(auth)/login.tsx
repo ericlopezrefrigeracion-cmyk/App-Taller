@@ -39,7 +39,7 @@ export default function LoginScreen() {
       await saveUser(data.usuario);
       router.replace('/(app)/');
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Credenciales incorrectas';
+      const message = error.response?.data?.error || error.response?.data?.message || 'No se pudo conectar al servidor';
       Alert.alert('Error al iniciar sesión', message);
     } finally {
       setLoading(false);
