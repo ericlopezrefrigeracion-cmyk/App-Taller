@@ -89,15 +89,17 @@ export interface OTItem {
   id: string;
   cantidad: number;
   notas: string | null;
-  precio_costo_usd_snap: string;
-  tc_valor_snap: string;
+  precio_costo_usd_snap: string | null;
+  tc_valor_snap: string | null;
+  descripcion: string | null;
+  precio_unitario_manual: string | null;
   producto: {
     id: string;
     nombre: string;
     codigo: string | null;
     tipo: string;
     unidad: string;
-  };
+  } | null;
 }
 
 export interface OTFoto {

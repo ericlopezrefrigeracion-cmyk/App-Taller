@@ -582,6 +582,10 @@ export default function OTDetailScreen() {
           {ot.equipo ? (
             <>
               <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Código</Text>
+                <Text style={styles.infoValue}>{ot.equipo.codigo_interno}</Text>
+              </View>
+              <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Marca / Modelo</Text>
                 <Text style={styles.infoValue}>
                   {ot.equipo.modelo?.marca?.nombre ?? ''} {ot.equipo.modelo?.nombre ?? ''}
@@ -737,10 +741,12 @@ export default function OTDetailScreen() {
             ot.items.map((item) => (
               <View key={item.id} style={styles.itemRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemNombre}>{item.producto.nombre}</Text>
-                  {item.producto.codigo && (
+                  <Text style={styles.itemNombre}>
+                    {item.producto?.nombre ?? item.descripcion ?? '—'}
+                  </Text>
+                  {item.producto?.codigo ? (
                     <Text style={styles.itemCodigo}>COD: {item.producto.codigo}</Text>
-                  )}
+                  ) : null}
                   {item.notas && <Text style={styles.itemNotas}>{item.notas}</Text>}
                 </View>
                 <Text style={styles.itemCantidad}>×{item.cantidad}</Text>
