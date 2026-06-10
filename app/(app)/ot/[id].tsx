@@ -521,7 +521,14 @@ export default function OTDetailScreen() {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Orden</Text>
-            <Text style={styles.infoValue}>#{ot.numero}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.infoValue}>#{ot.numero}</Text>
+              {ot.es_garantia && (
+                <View style={{ backgroundColor: '#fef3c7', borderRadius: 6, borderWidth: 1, borderColor: '#d97706', paddingHorizontal: 6, paddingVertical: 2 }}>
+                  <Text style={{ color: '#92400e', fontWeight: '700', fontSize: 11 }}>GARANTÍA</Text>
+                </View>
+              )}
+            </View>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Tipo</Text>
