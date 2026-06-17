@@ -133,6 +133,24 @@ export interface OTHistorial {
   usuario_id: string;
 }
 
+export interface OTDiagnosticoRespuesta {
+  id: string;
+  titulo: string;
+  descripcion: string | null;
+  tipo_respuesta: 'texto_libre' | 'si_no' | 'indicador';
+  obligatorio: boolean;
+  orden: number;
+  respuesta: string | null;
+  respondido_en: string | null;
+  respondido_por: string | null;
+}
+
+export interface OTDiagnostico {
+  id: string;
+  plantilla_nombre: string;
+  respuestas: OTDiagnosticoRespuesta[];
+}
+
 // ─── Tipos para GET /ordenes-armado/mis-ordenes ──────────────────────────────
 
 export interface OAItem {
@@ -165,7 +183,7 @@ export interface OrdenTrabajo {
   tipo: TipoOT;
   estado: EstadoOT;
   descripcion: string;
-  diagnostico: string | null;
+  estado_del_equipo: string | null;
   trabajo_realizado: string | null;
   fecha_programada: string | null;
   hora_programada: string | null;
@@ -182,5 +200,6 @@ export interface OrdenTrabajo {
   items: OTItem[];
   fotos: OTFoto[];
   checklist: OTChecklist[];
+  diagnosticos: OTDiagnostico[];
   historial: OTHistorial[];
 }

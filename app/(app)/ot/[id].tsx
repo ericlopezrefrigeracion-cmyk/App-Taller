@@ -25,6 +25,8 @@ import type {
   OrdenTrabajo,
   EstadoOT,
   OTChecklist,
+  OTDiagnostico,
+  OTDiagnosticoRespuesta,
   OTFoto,
   OTClienteDetalle,
 } from '../../../lib/types';
@@ -124,8 +126,8 @@ export default function OTDetailScreen() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
 
-  // Diagnóstico / trabajo realizado editables
-  const [diagnostico, setDiagnostico]         = useState('');
+  // Estado del equipo / trabajo realizado editables
+  const [estadoEquipo, setEstadoEquipo]         = useState('');
   const [trabajoRealizado, setTrabajoRealizado] = useState('');
   const [editDirty, setEditDirty]               = useState(false);
 
@@ -168,7 +170,7 @@ export default function OTDetailScreen() {
     try {
       const { data } = await api.get<{ data: OrdenTrabajo }>(`/ots/${id}`);
       setOt(data.data);
-      setDiagnostico(data.data.diagnostico ?? '');
+      setEstadoEquipo(data.data.estado_del_equipo ?? '');
       setTrabajoRealizado(data.data.trabajo_realizado ?? '');
       setEditDirty(false);
     } catch {
@@ -280,11 +282,11 @@ export default function OTDetailScreen() {
     ]);
   }
 
-  // ── Guardar diagnóstico / trabajo realizado ────────────────────────────────
+  // ── Guardar estado del equipo / trabajo realizado ─────────────────────────
   async function handleGuardarDiagnostico() {
     setSaving(true);
     try {
-      await api.patch(`/ots/${id}`, { diagnostico, trabajo_realizado: trabajoRealizado });
+      await api.patch(`/ots/${id}`, { estado_del_equipo: estadoEquipo, trabajo_realizado: trabajoRealizado });
       setEditDirty(false);
       await fetchOt();
     } catch {
@@ -352,6 +354,17 @@ export default function OTDetailScreen() {
         );
         return;
       }
+      // Validar diagnósticos obligatorios respondidos
+      const diagPendientes = (ot.diagnosticos ?? [])
+        .flatMap(d => d.respuestas)
+        .filter(r => r.obligatorio && (r.respuesta === null || r.respuesta === ''));
+      if (diagPendientes.length > 0) {
+        Alert.alert(
+          'Diagnósticos pendientes',
+          `Respondé los ${diagPendientes.length} ítem(s) obligatorio(s) de diagnóstico antes de cerrar la OT.`,
+        );
+        return;
+      }
       // Abrir flujo de cierre con firma integrada
       setCerrando(true);
       setFirmadoPor('');
@@ -380,6 +393,16 @@ export default function OTDetailScreen() {
       Alert.alert('Error', e.response?.data?.message || 'No se pudo cambiar el estado');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // ── Diagnósticos ──────────────────────────────────────────────────────────
+  async function responderDiagnostico(respId: string, respuesta: string | null) {
+    try {
+      await api.post(`/diagnosticos/responder/${respId}`, { respuesta });
+      await fetchOt();
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar la respuesta');
     }
   }
 
@@ -647,16 +670,16 @@ export default function OTDetailScreen() {
           )}
         </View>
 
-        {/* ── 5. Diagnóstico / trabajo realizado ──────────────────────── */}
+        {/* ── 5. Estado del equipo / trabajo realizado ────────────────── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Diagnóstico y trabajo</Text>
+          <Text style={styles.sectionTitle}>Estado del equipo y trabajo</Text>
 
-          <Text style={styles.fieldLabel}>Diagnóstico</Text>
+          <Text style={styles.fieldLabel}>Estado del equipo</Text>
           <TextInput
             style={[styles.textarea, !puedeEditar && styles.textareaDisabled]}
-            value={diagnostico}
-            onChangeText={(v) => { setDiagnostico(v); setEditDirty(true); }}
-            placeholder="Descripción del problema encontrado..."
+            value={estadoEquipo}
+            onChangeText={(v) => { setEstadoEquipo(v); setEditDirty(true); }}
+            placeholder="Descripción del estado del equipo..."
             placeholderTextColor="#555"
             multiline
             numberOfLines={4}
@@ -795,6 +818,33 @@ export default function OTDetailScreen() {
                   />
                 ))
               )}
+            </View>
+          );
+        })()}
+
+        {/* ── 8. Diagnósticos ─────────────────────────────────────────── */}
+        {(ot.diagnosticos ?? []).length > 0 && (() => {
+          const oblPendientes = ot.diagnosticos
+            .flatMap(d => d.respuestas)
+            .filter(r => r.obligatorio && (r.respuesta === null || r.respuesta === '')).length;
+          return (
+            <View style={styles.section}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Diagnósticos</Text>
+                {oblPendientes > 0 && (
+                  <View style={styles.obligBadge}>
+                    <Text style={styles.obligBadgeText}>⚠ {oblPendientes} OBLIG.</Text>
+                  </View>
+                )}
+              </View>
+              {ot.diagnosticos.map((diag) => (
+                <DiagnosticosSection
+                  key={diag.id}
+                  diagnostico={diag}
+                  canRespond={puedeEditar}
+                  onResponder={responderDiagnostico}
+                />
+              ))}
             </View>
           );
         })()}
@@ -1203,6 +1253,128 @@ function ChecklistSection({ checklist, otId, canToggle, onToggle }: ChecklistSec
               )}
             </View>
           </TouchableOpacity>
+        ))}
+    </View>
+  );
+}
+
+// ─── Sub-componente DiagnosticosSection ───────────────────────────────────────
+
+const INDICADOR_CFG = {
+  bueno:             { label: 'Bueno',            bg: '#0D2D1A', border: '#1A6E3A', text: '#4ADE80' },
+  requiere_atencion: { label: 'Req. Atención',    bg: '#2D1F00', border: '#7A5A00', text: '#FCD34D' },
+  critico:           { label: 'Crítico',          bg: '#2D0A0A', border: '#7A1A1A', text: '#F87171' },
+} as const;
+
+interface DiagnosticosSectionProps {
+  diagnostico: OTDiagnostico;
+  canRespond: boolean;
+  onResponder: (respId: string, respuesta: string | null) => void;
+}
+
+function DiagnosticosSection({ diagnostico, canRespond, onResponder }: DiagnosticosSectionProps) {
+  const respondidas = diagnostico.respuestas.filter(r => r.respuesta !== null && r.respuesta !== '').length;
+  const [textos, setTextos] = useState<Record<string, string>>({});
+
+  function getTexto(id: string, respActual: string | null) {
+    return textos[id] !== undefined ? textos[id] : (respActual ?? '');
+  }
+
+  return (
+    <View style={styles.diagContainer}>
+      <View style={styles.checklistHeader}>
+        <Text style={styles.checklistNombre}>{diagnostico.plantilla_nombre}</Text>
+        <Text style={styles.checklistProgress}>{respondidas}/{diagnostico.respuestas.length}</Text>
+      </View>
+
+      {diagnostico.respuestas
+        .sort((a, b) => a.orden - b.orden)
+        .map((resp) => (
+          <View key={resp.id} style={styles.diagRespRow}>
+            {/* Título e ícono obligatorio */}
+            <View style={styles.diagTituloRow}>
+              <Text style={styles.diagTitulo}>{resp.titulo}</Text>
+              {resp.obligatorio && (resp.respuesta === null || resp.respuesta === '') && (
+                <Text style={styles.tareaObligatoria}>OBLIGATORIO</Text>
+              )}
+            </View>
+            {resp.descripcion ? (
+              <Text style={styles.diagDescripcion}>{resp.descripcion}</Text>
+            ) : null}
+
+            {/* Control según tipo_respuesta */}
+            {resp.tipo_respuesta === 'si_no' && (
+              <View style={styles.diagSiNoRow}>
+                {(['si', 'no'] as const).map((val) => {
+                  const seleccionado = resp.respuesta === val;
+                  return (
+                    <TouchableOpacity
+                      key={val}
+                      style={[
+                        styles.diagSiNoBtn,
+                        seleccionado && { backgroundColor: val === 'si' ? '#1A6E3A' : '#7A1A1A', borderColor: val === 'si' ? '#1A6E3A' : '#7A1A1A' },
+                      ]}
+                      onPress={() => canRespond && onResponder(resp.id, seleccionado ? null : val)}
+                      activeOpacity={canRespond ? 0.6 : 1}
+                    >
+                      <Text style={[styles.diagSiNoBtnText, seleccionado && { color: '#fff' }]}>
+                        {val === 'si' ? 'SÍ' : 'NO'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {resp.tipo_respuesta === 'indicador' && (
+              <View style={styles.diagIndicadorRow}>
+                {(Object.keys(INDICADOR_CFG) as (keyof typeof INDICADOR_CFG)[]).map((val) => {
+                  const cfg = INDICADOR_CFG[val];
+                  const seleccionado = resp.respuesta === val;
+                  return (
+                    <TouchableOpacity
+                      key={val}
+                      style={[
+                        styles.diagIndicadorBtn,
+                        seleccionado && { backgroundColor: cfg.bg, borderColor: cfg.border },
+                      ]}
+                      onPress={() => canRespond && onResponder(resp.id, seleccionado ? null : val)}
+                      activeOpacity={canRespond ? 0.6 : 1}
+                    >
+                      <Text style={[styles.diagIndicadorBtnText, seleccionado && { color: cfg.text }]}>
+                        {cfg.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {resp.tipo_respuesta === 'texto_libre' && (
+              <View style={{ marginTop: 6, gap: 6 }}>
+                <TextInput
+                  style={[styles.textarea, { minHeight: 60 }, !canRespond && styles.textareaDisabled]}
+                  value={getTexto(resp.id, resp.respuesta)}
+                  onChangeText={(v) => setTextos(prev => ({ ...prev, [resp.id]: v }))}
+                  placeholder="Escribí tu respuesta..."
+                  placeholderTextColor="#555"
+                  multiline
+                  editable={canRespond}
+                />
+                {canRespond && textos[resp.id] !== undefined && textos[resp.id] !== (resp.respuesta ?? '') && (
+                  <TouchableOpacity
+                    style={[styles.secondaryBtn, { marginTop: 0 }]}
+                    onPress={() => {
+                      onResponder(resp.id, textos[resp.id] || null);
+                      setTextos(prev => { const n = { ...prev }; delete n[resp.id]; return n; });
+                    }}
+                  >
+                    <Text style={styles.secondaryBtnText}>GUARDAR RESPUESTA</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
         ))}
     </View>
   );
@@ -1650,6 +1822,74 @@ const styles = StyleSheet.create({
     color: '#E8500A',
     fontWeight: '600',
     marginTop: 2,
+  },
+
+  // Diagnósticos
+  diagContainer: {
+    marginBottom: 12,
+  },
+  diagRespRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1F1F1F',
+  },
+  diagTituloRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 4,
+  },
+  diagTitulo: {
+    fontSize: 14,
+    color: '#F5F5F5',
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 20,
+  },
+  diagDescripcion: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 6,
+    fontStyle: 'italic',
+  },
+  diagSiNoRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  diagSiNoBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 4,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  diagSiNoBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#888',
+    letterSpacing: 0.5,
+  },
+  diagIndicadorRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  diagIndicadorBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 4,
+    paddingVertical: 7,
+    alignItems: 'center',
+  },
+  diagIndicadorBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#666',
+    letterSpacing: 0.3,
   },
 
   // Modal estado
