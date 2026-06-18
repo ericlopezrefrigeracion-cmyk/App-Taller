@@ -57,6 +57,7 @@ const TIPO_LABEL: Record<string, string> = {
   correctivo:  'Correctivo',
   preventivo:  'Preventivo',
   instalacion: 'Instalación',
+  diagnostico: 'Diagnóstico',
 };
 
 type Transicion = { label: string; estado: EstadoOT };

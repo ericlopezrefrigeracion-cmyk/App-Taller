@@ -17,7 +17,8 @@ export type EstadoOT =
 export type TipoOT =
   | 'correctivo'
   | 'preventivo'
-  | 'instalacion';
+  | 'instalacion'
+  | 'diagnostico';
 
 export type PrioridadOT = 'baja' | 'normal' | 'alta' | 'urgente';
 
