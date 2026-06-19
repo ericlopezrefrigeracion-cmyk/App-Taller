@@ -647,28 +647,7 @@ export default function OTDetailScreen() {
         {/* ── 4. Estado ───────────────────────────────────────────────── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Estado</Text>
-
-          <View style={{ marginBottom: 12 }}>
-            <EstadoBadge estado={ot.estado} />
-          </View>
-
-          {transiciones.length > 0 && (
-            <View style={styles.transicionesRow}>
-              {transiciones.map((t) => (
-                <TouchableOpacity
-                  key={t.estado}
-                  style={[
-                    styles.transicionBtn,
-                    t.estado === 'cerrada' && styles.transicionBtnCerrar,
-                    t.estado === 'pendiente_repuesto' && styles.transicionBtnSuspender,
-                  ]}
-                  onPress={() => abrirModalEstado(t)}
-                >
-                  <Text style={styles.transicionBtnText}>{t.label.toUpperCase()}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          <EstadoBadge estado={ot.estado} />
         </View>
 
         {/* ── 5. Estado del equipo / trabajo realizado ────────────────── */}
@@ -929,6 +908,27 @@ export default function OTDetailScreen() {
                 {h.notas ? <Text style={styles.historialNotas}>{h.notas}</Text> : null}
               </View>
             ))}
+          </View>
+        )}
+
+        {/* ── Acciones de estado ───────────────────────────────────────── */}
+        {transiciones.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.transicionesRow}>
+              {transiciones.map((t) => (
+                <TouchableOpacity
+                  key={t.estado}
+                  style={[
+                    styles.transicionBtn,
+                    t.estado === 'cerrada' && styles.transicionBtnCerrar,
+                    t.estado === 'pendiente_repuesto' && styles.transicionBtnSuspender,
+                  ]}
+                  onPress={() => abrirModalEstado(t)}
+                >
+                  <Text style={styles.transicionBtnText}>{t.label.toUpperCase()}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 
