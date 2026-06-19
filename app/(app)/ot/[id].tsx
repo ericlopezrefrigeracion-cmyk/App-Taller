@@ -531,9 +531,11 @@ export default function OTDetailScreen() {
     );
   }
 
-  const transiciones = TRANSICIONES[ot.estado] ?? [];
-  const puedeEditar  = ['borrador', 'asignada', 'en_curso', 'pendiente_repuesto'].includes(ot.estado);
+  const transiciones  = TRANSICIONES[ot.estado] ?? [];
+  const puedeEditar   = ['borrador', 'asignada', 'en_curso', 'pendiente_repuesto'].includes(ot.estado);
   const necesitaFirma = ot.estado === 'cerrada' && !ot.firma_cliente;
+  // Secciones de trabajo solo visibles una vez iniciada la OT
+  const estaIniciada  = ['en_curso', 'pendiente_repuesto', 'cerrada', 'cancelada'].includes(ot.estado);
 
   return (
     <>
@@ -650,8 +652,8 @@ export default function OTDetailScreen() {
           <EstadoBadge estado={ot.estado} />
         </View>
 
-        {/* ── 5. Estado del equipo / trabajo realizado ────────────────── */}
-        <View style={styles.section}>
+        {/* ── 5. Estado del equipo / trabajo realizado (solo iniciada) ── */}
+        {estaIniciada && <View style={styles.section}>
           <Text style={styles.sectionTitle}>Estado del equipo y trabajo</Text>
 
           <Text style={styles.fieldLabel}>Estado del equipo</Text>
@@ -689,10 +691,10 @@ export default function OTDetailScreen() {
                 : <Text style={styles.saveBtnText}>GUARDAR CAMBIOS</Text>}
             </TouchableOpacity>
           )}
-        </View>
+        </View>}
 
-        {/* ── 6. Notas internas ───────────────────────────────────────── */}
-        <View style={styles.section}>
+        {/* ── 6. Notas internas (solo iniciada) ───────────────────────── */}
+        {estaIniciada && <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notas internas</Text>
 
           {parseNotas(ot.notas_internas).map((n, i) => (
@@ -733,7 +735,7 @@ export default function OTDetailScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </View>}
 
         {/* ── 7. Items / Repuestos ────────────────────────────────────── */}
         <View style={styles.section}>
@@ -770,8 +772,8 @@ export default function OTDetailScreen() {
           )}
         </View>
 
-        {/* ── 7. Checklist ────────────────────────────────────────────── */}
-        {(() => {
+        {/* ── 7. Checklist (solo iniciada) ────────────────────────────── */}
+        {estaIniciada && (() => {
           const oblPendientes = ot.checklist
             .flatMap(cl => cl.tareas)
             .filter(t => t.obligatoria && !t.completada).length;
@@ -802,8 +804,8 @@ export default function OTDetailScreen() {
           );
         })()}
 
-        {/* ── 8. Diagnósticos ─────────────────────────────────────────── */}
-        {(ot.diagnosticos ?? []).length > 0 && (() => {
+        {/* ── 8. Diagnósticos (solo iniciada) ─────────────────────────── */}
+        {estaIniciada && (ot.diagnosticos ?? []).length > 0 && (() => {
           const oblPendientes = ot.diagnosticos
             .flatMap(d => d.respuestas)
             .filter(r => r.obligatorio && (r.respuesta === null || r.respuesta === '')).length;
@@ -829,8 +831,8 @@ export default function OTDetailScreen() {
           );
         })()}
 
-        {/* ── 8a. Fotos ───────────────────────────────────────────────── */}
-        <View style={styles.section}>
+        {/* ── 8a. Fotos (solo iniciada) ───────────────────────────────── */}
+        {estaIniciada && <View style={styles.section}>
           <Text style={styles.sectionTitle}>Fotos</Text>
 
           {ot.fotos.length > 0 && (
@@ -859,10 +861,10 @@ export default function OTDetailScreen() {
           {ot.fotos.length === 0 && !puedeEditar && (
             <Text style={styles.emptyText}>Sin fotos</Text>
           )}
-        </View>
+        </View>}
 
-        {/* ── 8b. Firma ───────────────────────────────────────────────── */}
-        <View style={styles.section}>
+        {/* ── 8b. Firma (solo iniciada) ───────────────────────────────── */}
+        {estaIniciada && <View style={styles.section}>
           <Text style={styles.sectionTitle}>Firma del cliente</Text>
 
           {ot.firma_cliente && ot.firma_cliente !== 'app-tecnico-pending' ? (
@@ -891,10 +893,10 @@ export default function OTDetailScreen() {
           {ot.firmado_por && (
             <Text style={styles.firmadoPor}>Firmado por: {ot.firmado_por}</Text>
           )}
-        </View>
+        </View>}
 
-        {/* ── Historial ────────────────────────────────────────────────── */}
-        {ot.historial.length > 0 && (
+        {/* ── Historial (solo iniciada) ────────────────────────────────── */}
+        {estaIniciada && ot.historial.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Historial</Text>
             {ot.historial.map((h) => (
