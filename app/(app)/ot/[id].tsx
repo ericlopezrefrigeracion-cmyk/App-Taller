@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useNavigation } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../../../lib/api';
@@ -183,6 +183,24 @@ export default function OTDetailScreen() {
   }, [id]);
 
   useEffect(() => { fetchOt(); }, [fetchOt]);
+
+  // Guard: si hay cambios sin guardar, confirmar antes de salir
+  const navigation = useNavigation();
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      if (!editDirty) return;
+      e.preventDefault();
+      Alert.alert(
+        'Cambios sin guardar',
+        '¿Querés salir? Los cambios en "Estado del equipo" y "Trabajo realizado" no se guardarán.',
+        [
+          { text: 'Seguir editando', style: 'cancel' },
+          { text: 'Salir igual', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ],
+      );
+    });
+    return unsub;
+  }, [navigation, editDirty]);
 
   // ── Equipo ─────────────────────────────────────────────────────────────────
 
